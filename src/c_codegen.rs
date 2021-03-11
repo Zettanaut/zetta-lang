@@ -1,4 +1,4 @@
-use ast::*;
+use crate::ast::*;
 
 
 struct CodeGenContext {
@@ -47,8 +47,8 @@ fn get_type(t: Type, ctx: &CodeGenContext) -> String {
         Type::Float(size) => format!("f{}", get_float_size_postfix(size)),
         Type::Unsigned(size) => format!("u{}", get_int_size_postfix(size)),
         Type::Bool => "int".to_string(),
-        Type::Ptr(box inner) => format!("{}*", get_type(inner, ctx)),
-        Type::Slice(box inner) => "struct _paridae_slice".to_string(),
+        Type::Ptr(inner) => format!("{}*", get_type(*inner, ctx)),
+        Type::Slice(_) => "struct _paridae_slice".to_string(),
         Type::Struct(name, _) => format!("struct {}", name),
         Type::Union(name, _) => format!("union {}", name),
         Type::Enum(name, _) => format!("enum {}", name),
@@ -107,8 +107,8 @@ fn generate_call(fun: Expr, args: Vec<Box<Expr>>, ctx: &mut CodeGenContext) -> S
 
     let mut arg_values = Vec::new();
 
-    for box arg in args {
-        arg_values.push(generate_expr(arg, ctx));
+    for arg in args {
+        arg_values.push(generate_expr(*arg, ctx));
     }
 
     format!("{}({})", fun_expr, arg_values.join(","))
@@ -119,9 +119,9 @@ fn generate_condition(condition: Expr, then: Block, otherwise: Option<Box<Block>
 
     ctx.builder.push(format!("if ({})", condition_value));
     generate_block(then, ctx);
-    if let Some(box o) = otherwise {
+    if let Some(o) = otherwise {
         ctx.builder.push(String::from("else"));
-        generate_block(o, ctx);
+        generate_block(*o, ctx);
     }
     String::from("")
 }
@@ -147,8 +147,8 @@ fn generate_array_index(array: Expr, index: Expr, ctx: &mut CodeGenContext) -> S
 
     if let Type::Ptr(_) = array_type {
         format!("{}[{}]", ptr, offset)
-    } else if let Type::Slice(box inner) = array_type {
-        let inner_str = get_type(inner, ctx);
+    } else if let Type::Slice(inner) = array_type {
+        let inner_str = get_type(*inner, ctx);
         format!("*(({}*) &({}.ptr[{}*sizeof({})]))", inner_str , ptr, offset, inner_str)
     } else {
         panic!("Indexing into {:?} not implemented", array_type);
@@ -164,15 +164,15 @@ fn generate_expr(expr: Expr, ctx: &mut CodeGenContext) -> String {
     use self::ExprKind::*;
 
     match expr.node {
-        Cast(target, box inner) => generate_cast(target, inner, ctx),
-        Unary(op, box inner) => generate_unary_operator(op, inner, ctx),
-        Binary(op, box lhs, box rhs) => generate_binary_operator(op, lhs, rhs, ctx),
-        Literal(box lit) => generate_literal(lit, expr.t),
+        Cast(target, inner) => generate_cast(target, *inner, ctx),
+        Unary(op, inner) => generate_unary_operator(op, *inner, ctx),
+        Binary(op, lhs, rhs) => generate_binary_operator(op, *lhs, *rhs, ctx),
+        Literal(lit) => generate_literal(*lit, expr.t),
         Identifier(s) => s,
-        Call(box fun, args) => generate_call(fun, args, ctx),
-        If(box condition, box then, otherwise) => generate_condition(condition, then, otherwise, ctx),
-        Member(box owner, field_name) => generate_field_access(owner, field_name, ctx),
-        Index(box array, box index) => generate_array_index(array, index, ctx),
+        Call(fun, args) => generate_call(*fun, args, ctx),
+        If(condition, then, otherwise) => generate_condition(*condition, *then, otherwise, ctx),
+        Member(owner, field_name) => generate_field_access(*owner, field_name, ctx),
+        Index(array, index) => generate_array_index(*array, *index, ctx),
     }
 }
 
@@ -201,14 +201,14 @@ fn generate_stmt(stmt: Stmt, ctx: &mut CodeGenContext) {
     use self::StmtKind::*;
 
     match stmt.node {
-        Return(box e) => generate_return(e, ctx),
-        Item(box i) => generate_item(i, ctx),
-        Expr(box e) => {
-            let result = generate_expr(e, ctx);
+        Return(e) => generate_return(*e, ctx),
+        Item(i) => generate_item(*i, ctx),
+        Expr(e) => {
+            let result = generate_expr(*e, ctx);
             ctx.builder.push(result + ";");
         },
-        While(box c, box b) => generate_while(c, b, ctx),
-        Assignment(box place, box value) => generate_assignment(place, value, ctx),
+        While(c, b) => generate_while(*c, *b, ctx),
+        Assignment(place, value) => generate_assignment(*place, *value, ctx),
         Break => ctx.builder.push(String::from("break;")),
         Continue => ctx.builder.push(String::from("continue;")),
         _ => panic!("Other statement kinds not yet supported {:?}", stmt.node),
@@ -246,8 +246,8 @@ fn generate_variable_decl(name: String, _type: Type, expr: Option<Box<Expr>>, ct
 
     let var_type = get_type(_type, ctx);
 
-    let decl = if let Some(box e) = expr {
-        let initial_value = generate_expr(e, ctx);
+    let decl = if let Some(e) = expr {
+        let initial_value = generate_expr(*e, ctx);
         format!("{} {} = {};", var_type, name, initial_value)
     } else {
         format!("{} {};", var_type, name)
@@ -310,9 +310,9 @@ fn generate_item(item: Item, ctx: &mut CodeGenContext) {
 
     let name = item.name.clone();
     match item.node {
-        FunctionDecl(box sig, block) => generate_function_decl(name, sig, block, ctx),
+        FunctionDecl(sig, block) => generate_function_decl(name, *sig, block, ctx),
         VariableDecl(t, expr) => generate_variable_decl(name, t, expr, ctx),
-        ConstDecl(t, box expr) => generate_const_decl(name, t, expr, ctx),
+        ConstDecl(t, expr) => generate_const_decl(name, t, *expr, ctx),
         StructDecl(t) => generate_struct_decl(name, t, ctx),
         UnionDecl(t) => generate_union_decl(name, t, ctx),
         EnumDecl(t) => generate_enum_decl(name, t, ctx),

@@ -1,4 +1,4 @@
-use tokens::*;
+use crate::tokens::*;
 
 struct LexingContext {
     start: usize,
@@ -147,7 +147,7 @@ fn directive(ctx: &mut LexingContext) {
 }
 
 fn scan_token(ctx: &mut LexingContext) {
-    use tokens::TokenType::*;
+    use TokenType::*;
 
     let c = advance(ctx);
 

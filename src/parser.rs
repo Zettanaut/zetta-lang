@@ -1,5 +1,5 @@
-use tokens::*;
-use ast::*;
+use crate::tokens::*;
+use crate::ast::*;
 
 use std::collections::HashMap;
 
@@ -89,20 +89,20 @@ fn parse_if(ctx: &mut ParsingContext) -> Expr {
     let otherwise = if accept(ctx, TokenType::Else) {
         if accept(ctx, TokenType::If) {
             let nested = parse_if(ctx);
-            let block = Block { stmts: vec![ Stmt { node: StmtKind::Expr(box nested) }] };
-            Some(box block)
+            let block = Block { stmts: vec![ Stmt { node: StmtKind::Expr(Box::new(nested)) }] };
+            Some(Box::new(block))
         } else {
-            Some(box parse_block(ctx))
+            Some(Box::new(parse_block(ctx)))
         }
     } else {
         None
     };
 
-    Expr { node: ExprKind::If(box condition, box then, otherwise), t: Type::Infer }
+    Expr { node: ExprKind::If(Box::new(condition), Box::new(then), otherwise), t: Type::Infer }
 }
 
 fn get_precedence(operator: BinaryOperatorKind) -> u32 {
-    use ast::BinaryOperatorKind::*;
+    use BinaryOperatorKind::*;
 
     match operator {
         Product => 10,
@@ -153,7 +153,7 @@ fn parse_identifier(ctx: &mut ParsingContext, token: Token) -> Expr {
 }
 
 fn parse_prefix_operator(ctx: &mut ParsingContext, token: Token) -> Expr {
-    use tokens::TokenType::*;
+    use TokenType::*;
 
     let operation = match token.token_type {
         Minus => UnaryOperatorKind::Negation,
@@ -168,7 +168,7 @@ fn parse_prefix_operator(ctx: &mut ParsingContext, token: Token) -> Expr {
 }
 
 fn convert_token_to_binary_operator(token: TokenType) -> Option<BinaryOperatorKind> {
-    use tokens::TokenType::*;
+    use TokenType::*;
 
     match token {
         Plus => Some(BinaryOperatorKind::Addition),
@@ -225,7 +225,7 @@ fn parse_member_access(ctx: &mut ParsingContext, left: Expr) -> Expr {
     let t = match left.t.clone() {
         Type::Union(name, _) => find_type(name.clone(), field_name.clone()),
         Type::Struct(name, _) => find_type(name.clone(), field_name.clone()),
-        Type::Ptr(box inner) => match inner {
+        Type::Ptr(inner) => match *inner {
             Type::Union(name, _) => find_type(name.clone(), field_name.clone()),
             Type::Struct(name, _) => find_type(name.clone(), field_name.clone()),
             _ => panic!("Unable to access field \"{}\" in {:?}", field_name, left),
@@ -237,18 +237,18 @@ fn parse_member_access(ctx: &mut ParsingContext, left: Expr) -> Expr {
         panic!("No such field \"{}\" in {:?} on line {}", field_name, left.t, field_token.line);
     }
 
-    Expr { node: ExprKind::Member(box left, field_name), t: t.unwrap() }
+    Expr { node: ExprKind::Member(Box::new(left), field_name), t: t.unwrap() }
 }
 
 fn parse_indexing(ctx: &mut ParsingContext, left: Expr) -> Expr {
     let index = parse_expression(ctx, 0);
     expect(ctx, TokenType::RightBracket);
 
-    Expr { node: ExprKind::Index(box left, box index), t: Type::Infer }
+    Expr { node: ExprKind::Index(Box::new(left), Box::new(index)), t: Type::Infer }
 }
 
 fn parse_infix_operator(ctx: &mut ParsingContext, left: Expr, token: Token) -> Expr {
-    use self::TokenType::*;
+    use TokenType::*;
 
     if token.token_type == LeftParen {
         parse_call(ctx, left)
@@ -264,7 +264,7 @@ fn parse_infix_operator(ctx: &mut ParsingContext, left: Expr, token: Token) -> E
 }
 
 fn parse_call(ctx: &mut ParsingContext, left: Expr) -> Expr {
-    use self::TokenType::*;
+    use TokenType::*;
 
     let mut args = Vec::new();
 
@@ -277,20 +277,20 @@ fn parse_call(ctx: &mut ParsingContext, left: Expr) -> Expr {
             } else {
                 panic!("Was unable to sizeof type {:?}", arg);
             };
-            return Expr { node: ExprKind::Call(box left, vec![box Expr { node: ExprKind::Identifier(type_name), t: arg}]), t: Type::Unsigned(IntegerSize::I64)};
+            return Expr { node: ExprKind::Call(Box::new(left), vec![Box::new(Expr { node: ExprKind::Identifier(type_name), t: arg})]), t: Type::Unsigned(IntegerSize::I64)};
         }
     }
 
     if !accept(ctx, RightParen) {
         loop {
             let expr = parse_expression(ctx, 0);
-            args.push(box expr);
+            args.push(Box::new( expr));
             if !accept(ctx, Comma) { break; }
         }
         expect(ctx, RightParen);
     }
 
-    Expr {node: ExprKind::Call(box left,  args), t: Type::Infer }
+    Expr {node: ExprKind::Call(Box::new(left),  args), t: Type::Infer }
 }
 
 fn parse_cast(ctx: &mut ParsingContext) -> Expr {
@@ -299,11 +299,11 @@ fn parse_cast(ctx: &mut ParsingContext) -> Expr {
     expect(ctx, TokenType::Comma);
     let inner = parse_expression(ctx, 0);
     expect(ctx, TokenType::RightParen);
-    Expr { node: ExprKind::Cast(target.clone(), box inner), t: target }
+    Expr { node: ExprKind::Cast(target.clone(), Box::new(inner)), t: target }
 }
 
 fn get_current_precedence(ctx: &mut ParsingContext) -> u32 {
-    use self::TokenType::*;
+    use TokenType::*;
 
     if ctx.tokens.len() <= ctx.current {
         0
@@ -321,7 +321,7 @@ fn get_current_precedence(ctx: &mut ParsingContext) -> u32 {
 
 
 fn parse_expression(ctx: &mut ParsingContext, precedence: u32) -> Expr {
-    use tokens::TokenType::*;
+    use TokenType::*;
 
     let token = consume(ctx);
 
@@ -352,7 +352,7 @@ fn parse_expression(ctx: &mut ParsingContext, precedence: u32) -> Expr {
 }
 
 fn primitive_type_by_name(name: &String, ctx: &ParsingContext) -> Type {
-    use self::Type::*;
+    use Type::*;
 
     match name.as_ref() {
         "int" => Signed(IntegerSize::Unspecified),
@@ -387,11 +387,11 @@ fn parse_type(ctx: &mut ParsingContext) -> Type {
         }
     } else if token.token_type == TokenType::Star {
         let inner = parse_type(ctx);
-        Type::Ptr(box inner)
+        Type::Ptr(Box::new(inner))
     } else if token.token_type == TokenType::LeftBracket {
         expect(ctx, TokenType::RightBracket);
         let inner = parse_type(ctx);
-        Type::Slice(box inner)
+        Type::Slice(Box::new(inner))
     } else {
         panic!("Expected type but got {:?} on line {:?}", token.token_type, token.line);
     }
@@ -407,7 +407,7 @@ fn parse_variable_decl(ctx: &mut ParsingContext) -> Item {
         t
     };
     let expr = if accept(ctx, TokenType::Equal) {
-        Some(box parse_expression(ctx, 0))
+        Some(Box::new(parse_expression(ctx, 0)))
     } else {
         None
     };
@@ -424,11 +424,11 @@ fn parse_const_decl(ctx: &mut ParsingContext) -> Item {
 fn parse_assignment(place: Expr, ctx: &mut ParsingContext) -> Stmt {
     expect(ctx, TokenType::Equal);
     let value = parse_expression(ctx, 0);
-    Stmt { node: StmtKind::Assignment(box place, box value) }
+    Stmt { node: StmtKind::Assignment(Box::new(place), Box::new(value)) }
 }
 
 fn parse_stmt(ctx: &mut ParsingContext) -> Stmt {
-    use self::TokenType::*;
+    use TokenType::*;
 
     let mut semicolon_exception = false;
 
@@ -438,21 +438,21 @@ fn parse_stmt(ctx: &mut ParsingContext) -> Stmt {
         Stmt { node: StmtKind::Continue }
     } else if accept(ctx, Return) {
         let expr = parse_expression(ctx, 0);
-        Stmt { node: StmtKind::Return(box expr) }
+        Stmt { node: StmtKind::Return(Box::new(expr)) }
     } else if accept(ctx, Defer) {
         let expr = parse_expression(ctx, 0);
-        Stmt { node: StmtKind::Defer(box expr) }
+        Stmt { node: StmtKind::Defer(Box::new(expr)) }
     } else if accept(ctx, While) {
         let expr = parse_expression(ctx, 0);
         let block = parse_block(ctx);
         semicolon_exception = true;
-        Stmt { node: StmtKind::While(box expr, box block) }
+        Stmt { node: StmtKind::While(Box::new(expr), Box::new(block)) }
     } else if accept(ctx, Semicolon) {
         Stmt { node: StmtKind::Empty }
     } else {
 
         if look_ahead(ctx, 0).token_type == Identifier && look_ahead(ctx, 1).token_type == Colon {
-            Stmt { node: StmtKind::Item(box parse_variable_decl(ctx)) }
+            Stmt { node: StmtKind::Item(Box::new(parse_variable_decl(ctx))) }
         } else {
             let left = parse_expression(ctx, 0);
             let next = look_ahead(ctx, 0);
@@ -466,7 +466,7 @@ fn parse_stmt(ctx: &mut ParsingContext) -> Stmt {
             if next.token_type == Equal {
                 parse_assignment(left, ctx)
             } else if semicolon_exception || next.token_type == Semicolon || next.token_type == RightCurly {
-                Stmt { node: StmtKind::Expr(box left) }
+                Stmt { node: StmtKind::Expr(Box::new(left)) }
             } else {
                 panic!("Unexpected token {:?} on line {} ", next, next.line);
             }
@@ -479,7 +479,7 @@ fn parse_stmt(ctx: &mut ParsingContext) -> Stmt {
 }
 
 fn parse_block(ctx: &mut ParsingContext) -> Block {
-    use self::TokenType::*;
+    use TokenType::*;
 
     let mut stmts = Vec::new();
 
@@ -496,7 +496,7 @@ fn parse_block(ctx: &mut ParsingContext) -> Block {
 }
 
 fn parse_signature(ctx: &mut ParsingContext) -> Signature {
-    use self::TokenType::*;
+    use TokenType::*;
 
     let mut inputs = Vec::new();
 
@@ -529,11 +529,11 @@ fn signature_to_function_type(signature: &Signature) -> Type {
     for (t,n) in &signature.inputs {
         types.push(t.clone());
     }
-    Type::Function(types, box signature.output.clone())
+    Type::Function(types, Box::new(signature.output.clone()))
 }
 
 fn parse_function_decl(ctx: &mut ParsingContext) -> Item {
-    use self::TokenType::*;
+    use TokenType::*;
 
     let identifier = consume(ctx);
     let name = identifier.lexeme.unwrap();
@@ -549,7 +549,7 @@ fn parse_function_decl(ctx: &mut ParsingContext) -> Item {
     }
 
     let block = if look_ahead(ctx, 0).token_type == LeftCurly {
-        Some(box parse_block(ctx))
+        Some(Box::new(parse_block(ctx)))
     } else {
         None
     };
@@ -557,7 +557,7 @@ fn parse_function_decl(ctx: &mut ParsingContext) -> Item {
 
     finalize_scope(ctx);
 
-    let node = ItemKind::FunctionDecl(box signature, block);
+    let node = ItemKind::FunctionDecl(Box::new(signature), block);
 
     Item {name, node, line: identifier.line }
 }
@@ -666,7 +666,7 @@ fn parse_union_decl(ctx: &mut ParsingContext) -> Item {
 }
 
 fn parse_item(ctx: &mut ParsingContext) -> Item {
-    use self::TokenType::*;
+    use TokenType::*;
     let token = look_ahead(ctx, 0);
     if token.token_type == Directive {
         return parse_directive(ctx);
@@ -696,10 +696,10 @@ pub fn parse(tokens: Vec<Token>) -> Vec<Item> {
 
     let mut ctx = ParsingContext {current: 0, tokens, types: HashMap::new(), current_scope_arena: 0, scope_arena: vec![global_scope]};
 
-    declare_symbol(&String::from("sizeof"), &Type::Function(vec![Type::Void], box Type::Unsigned(IntegerSize::I64)), &mut ctx);
-    declare_symbol(&String::from("printf"), &Type::Function(vec![Type::Void], box Type::Void), &mut ctx);
-    declare_symbol(&String::from("sprintf"), &Type::Function(vec![Type::Void], box Type::Void), &mut ctx);
-    declare_symbol(&String::from("fprintf"), &Type::Function(vec![Type::Void], box Type::Signed(IntegerSize::I32)), &mut ctx);
+    declare_symbol(&String::from("sizeof"), &Type::Function(vec![Type::Void], Box::new(Type::Unsigned(IntegerSize::I64))), &mut ctx);
+    declare_symbol(&String::from("printf"), &Type::Function(vec![Type::Void], Box::new(Type::Void)), &mut ctx);
+    declare_symbol(&String::from("sprintf"), &Type::Function(vec![Type::Void], Box::new(Type::Void)), &mut ctx);
+    declare_symbol(&String::from("fprintf"), &Type::Function(vec![Type::Void], Box::new(Type::Signed(IntegerSize::I32))), &mut ctx);
 
     let mut ast = Vec::new();
     while !is_done(&mut ctx) {

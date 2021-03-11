@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use ast::*;
+use crate::ast::*;
 
 struct TypeScope {
     symbols: HashMap<String, Type>,
