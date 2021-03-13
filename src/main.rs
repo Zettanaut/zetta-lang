@@ -5,11 +5,11 @@ use std::env;
 use std::path::Path;
 use std::process::Command;
 
-mod lexer;
-mod tokens;
-mod ast;
-mod parser;
+mod span;
+mod syntax;
 mod c_codegen;
+
+use syntax::{ast, lexer, parser};
 
 fn parse_source_file<P: AsRef<Path>>(path: P) -> Vec<ast::Item> {
     let mut file = File::open(path).unwrap();

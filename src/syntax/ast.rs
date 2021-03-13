@@ -1,8 +1,11 @@
+use super::literal::Literal;
+use crate::span::Span;
+
 #[derive(Debug, Clone)]
 pub struct Item {
     pub name: String,
     pub node: ItemKind,
-    pub line: usize,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]
@@ -146,16 +149,15 @@ pub enum BinaryOperatorKind {
 
 #[derive(Debug, Clone)]
 pub struct Expr {
-    pub node: ExprKind,
+    pub kind: ExprKind,
     pub t: Type
 }
 
-#[derive(Debug, Clone)]
-pub enum LitKind {
-    Str(String),
-    Int(i64),
-    Float(f64),
-    Bool(bool)
+impl Expr {
+
+    pub fn new(kind: ExprKind, t: Type) -> Expr {
+        Expr { kind, t }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -174,7 +176,7 @@ pub enum ExprKind {
     //Indexing into array or slice "a[i]"
     Index(Box<Expr>, Box<Expr>),
     //Literal such as 12 or "hello"
-    Literal(Box<LitKind>),
+    Literal(Literal),
     //Field access in struct "a.b"
     Member(Box<Expr>, String),
     //Unary operators such as negation or pointer dereferencing

@@ -1,4 +1,7 @@
-use crate::tokens::*;
+use crate::span::Span;
+use super::tokens::*;
+use std::thread::current;
+use crate::syntax::literal::Literal;
 
 struct LexingContext {
     start: usize,
@@ -37,43 +40,28 @@ fn advance(ctx: &mut LexingContext) -> char {
     *ctx.source.get(ctx.current - 1).unwrap()
 }
 
-fn add_simple_token(ctx: &mut LexingContext, t: TokenType) {
-    ctx.tokens.push(Token {
-        token_type: t,
-        lexeme: None,
-        line: ctx.line,
-    });
+fn add_token(ctx: &mut LexingContext, kind: TokenKind) {
+    let span = Span::new(ctx.start as u32, ctx.current as u32);
+    ctx.tokens.push(Token::new(kind, span));
 }
 
 fn add_lookahead_conditional_token(
     ctx: &mut LexingContext,
     expect: char,
-    first: TokenType,
-    second: TokenType,
+    first: TokenKind,
+    second: TokenKind,
 ) {
-    let t = if peek(ctx) == expect {
+    let kind = if peek(ctx) == expect {
         advance(ctx);
         first
     } else {
         second
     };
-    ctx.tokens.push(Token {
-        token_type: t,
-        lexeme: None,
-        line: ctx.line,
-    });
+    add_token(ctx, kind);
 }
 
 fn get_lexeme(ctx: &mut LexingContext) -> String {
     ctx.source[ctx.start..ctx.current].iter().collect()
-}
-
-fn add_lexeme_token(ctx: &mut LexingContext, lexeme: String, token_type: TokenType) {
-    ctx.tokens.push(Token {
-        token_type,
-        lexeme: Some(lexeme),
-        line: ctx.line,
-    });
 }
 
 fn single_line_comment(ctx: &mut LexingContext) {
@@ -98,7 +86,7 @@ fn string(ctx: &mut LexingContext) {
     advance(ctx);
     let lexeme = get_lexeme(ctx);
     let string_content = lexeme[1..(lexeme.len()-1)].to_string();
-    add_lexeme_token(ctx, string_content, TokenType::String);
+    add_token(ctx, TokenKind::Lit(Literal::new_str(string_content)));
 }
 
 fn number(ctx: &mut LexingContext) {
@@ -117,13 +105,12 @@ fn number(ctx: &mut LexingContext) {
     }
 
     let lexeme = get_lexeme(ctx);
-    let t = if dot_encountered {
-        TokenType::Float
+    if dot_encountered {
+        add_token(ctx, TokenKind::Lit(Literal::new_float(lexeme)));
     } else {
-        TokenType::Integer
+        add_token(ctx, TokenKind::Lit(Literal::new_int(lexeme)));
     };
 
-    add_lexeme_token(ctx, lexeme, t);
 }
 
 fn identifier(ctx: &mut LexingContext) {
@@ -132,39 +119,32 @@ fn identifier(ctx: &mut LexingContext) {
     }
     let lexeme = get_lexeme(ctx);
     if let Some(t) = is_keyword(lexeme.as_str()) {
-        add_simple_token(ctx, t);
+        add_token(ctx, t);
     } else {
-        add_lexeme_token(ctx, lexeme, TokenType::Identifier);
+        let lexeme = get_lexeme(ctx);
+        add_token(ctx, TokenKind::Identifier(lexeme));
     }
-}
-
-fn directive(ctx: &mut LexingContext) {
-    while peek(ctx) != '\n' {
-        advance(ctx);
-    }
-    let lexeme = get_lexeme(ctx);
-    add_lexeme_token(ctx, lexeme, TokenType::Directive);
 }
 
 fn scan_token(ctx: &mut LexingContext) {
-    use TokenType::*;
+    use TokenKind::*;
 
     let c = advance(ctx);
 
     match c {
-        '(' => add_simple_token(ctx, LeftParen),
-        ')' => add_simple_token(ctx, RightParen),
-        '[' => add_simple_token(ctx, LeftBracket),
-        ']' => add_simple_token(ctx, RightBracket),
-        '{' => add_simple_token(ctx, LeftCurly),
-        '}' => add_simple_token(ctx, RightCurly),
-        '+' => add_simple_token(ctx, Plus),
-        '*' => add_simple_token(ctx, Star),
-        '%' => add_simple_token(ctx, Percent),
-        '^' => add_simple_token(ctx, Hat),
-        ';' => add_simple_token(ctx, Semicolon),
-        '.' => add_simple_token(ctx, Dot),
-        ',' => add_simple_token(ctx, Comma),
+        '(' => add_token(ctx, OpenParen),
+        ')' => add_token(ctx, CloseParen),
+        '[' => add_token(ctx, OpenBracket),
+        ']' => add_token(ctx, CloseBracket),
+        '{' => add_token(ctx, OpenCurly),
+        '}' => add_token(ctx, CloseCurly),
+        '+' => add_token(ctx, Plus),
+        '*' => add_token(ctx, Star),
+        '%' => add_token(ctx, Percent),
+        '^' => add_token(ctx, Hat),
+        ';' => add_token(ctx, Semicolon),
+        '.' => add_token(ctx, Dot),
+        ',' => add_token(ctx, Comma),
         '-' => add_lookahead_conditional_token(ctx,'>', Arrow, Minus),
         ':' => add_lookahead_conditional_token(ctx, ':', ColonColon, Colon),
         '=' => add_lookahead_conditional_token(ctx, '=', EqualEqual, Equal),
@@ -177,7 +157,7 @@ fn scan_token(ctx: &mut LexingContext) {
                 '<' => {advance(ctx); LessLess},
                 _ => Less
             };
-            add_simple_token(ctx,t);
+            add_token(ctx,t);
         },
         '>' => {
             let t = match peek(ctx) {
@@ -185,7 +165,7 @@ fn scan_token(ctx: &mut LexingContext) {
                 '>' => {advance(ctx); GreaterGreater},
                 _ => Greater
             };
-            add_simple_token(ctx,t);
+            add_token(ctx,t);
         },
 
         '/' => {
@@ -193,11 +173,8 @@ fn scan_token(ctx: &mut LexingContext) {
             if next == '/' {
                 single_line_comment(ctx);
             } else {
-                add_simple_token(ctx, Slash);
+                add_token(ctx, Slash);
             }
-        }
-        '#' => {
-            directive(ctx);
         }
         ' ' => {}
         '\t' => {}

@@ -1,18 +1,17 @@
-use crate::ast::*;
+use crate::syntax::{ast::*, literal::*};
 
 
 struct CodeGenContext {
     builder: Vec<String>,
 }
 
-fn generate_literal(lit: LitKind, t: Type) -> String {
-    use self::LitKind::*;
+fn generate_literal(lit: Literal, t: Type) -> String {
 
-    match lit {
-        Int(i) =>format!("{}", i),
-        Str(s) => format!("\"{}\"", s), // TODO Stick with c strings for now
-        Bool(b) => if b {String::from("1")} else {String::from("0")},
-        Float(f) => format!("{}", f),
+    match lit.kind {
+        LiteralKind::Int =>format!("{}", lit.lexeme),
+        LiteralKind::Str => format!("\"{}\"", lit.lexeme), // TODO Stick with c strings for now
+        LiteralKind::Bool => if lit.lexeme == "true" {String::from("1")} else {String::from("0")},
+        LiteralKind::Float => format!("{}", lit.lexeme),
         _ => panic!("Literal type {:?} not yet supported!", t)
     }
 }
@@ -163,11 +162,11 @@ fn generate_cast(target: Type, inner: Expr, ctx: &mut CodeGenContext) -> String 
 fn generate_expr(expr: Expr, ctx: &mut CodeGenContext) -> String {
     use self::ExprKind::*;
 
-    match expr.node {
+    match expr.kind {
         Cast(target, inner) => generate_cast(target, *inner, ctx),
         Unary(op, inner) => generate_unary_operator(op, *inner, ctx),
         Binary(op, lhs, rhs) => generate_binary_operator(op, *lhs, *rhs, ctx),
-        Literal(lit) => generate_literal(*lit, expr.t),
+        Literal(lit) => generate_literal(lit, expr.t),
         Identifier(s) => s,
         Call(fun, args) => generate_call(*fun, args, ctx),
         If(condition, then, otherwise) => generate_condition(*condition, *then, otherwise, ctx),
