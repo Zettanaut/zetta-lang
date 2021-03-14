@@ -191,7 +191,6 @@ fn parse_member_access(ctx: &mut ParsingContext, left: Expr) -> Expr {
 
     let mut find_type = |struct_name: String, search_name: String| {
         let search_fields: Vec<(String, Type)> = match ctx.types.get(&struct_name) {
-            Some(Type::Union(_, xs)) => xs.clone(),
             Some(Type::Struct(_, xs)) => xs.clone(),
             _ => panic!("Unable to access field \"{}\" in {}", search_name, struct_name),
         };
@@ -205,10 +204,8 @@ fn parse_member_access(ctx: &mut ParsingContext, left: Expr) -> Expr {
     };
 
     let t = match left.t.clone() {
-        Type::Union(name, _) => find_type(name.clone(), field_name.clone()),
         Type::Struct(name, _) => find_type(name.clone(), field_name.clone()),
         Type::Ptr(inner) => match *inner {
-            Type::Union(name, _) => find_type(name.clone(), field_name.clone()),
             Type::Struct(name, _) => find_type(name.clone(), field_name.clone()),
             _ => panic!("Unable to access field \"{}\" in {:?}", field_name, left),
         }

@@ -49,7 +49,6 @@ fn get_type(t: Type, ctx: &CodeGenContext) -> String {
         Type::Ptr(inner) => format!("{}*", get_type(*inner, ctx)),
         Type::Slice(_) => "struct _paridae_slice".to_string(),
         Type::Struct(name, _) => format!("struct {}", name),
-        Type::Union(name, _) => format!("union {}", name),
         Type::Enum(name, _) => format!("enum {}", name),
         other => panic!("Type {:?} is not yet implemented", other),
     }
@@ -279,19 +278,6 @@ fn generate_struct_decl(name: String, _type: Type, ctx: &mut CodeGenContext) {
     }
 }
 
-fn generate_union_decl(name: String, _type: Type, ctx: &mut CodeGenContext) {
-    ctx.builder.push(format!("union {} {{", name));
-    if let Type::Union(_, fields) = _type {
-        for (field_name, field_type) in &fields {
-            let type_string = get_type(field_type.clone(), ctx);
-            ctx.builder.push(format!("{} {};", type_string, field_name));
-        }
-    } else {
-        panic!("ICE: Passed non-union type decl to 'generate_union_decl'");
-    }
-    ctx.builder.push(String::from("};"));
-}
-
 fn generate_enum_decl(name: String, _type: Type, ctx: &mut CodeGenContext) {
     ctx.builder.push(format!("enum {} {{", name));
     if let Type::Enum(_, variants) = _type {
@@ -313,9 +299,7 @@ fn generate_item(item: Item, ctx: &mut CodeGenContext) {
         VariableDecl(t, expr) => generate_variable_decl(name, t, expr, ctx),
         ConstDecl(t, expr) => generate_const_decl(name, t, *expr, ctx),
         StructDecl(t) => generate_struct_decl(name, t, ctx),
-        UnionDecl(t) => generate_union_decl(name, t, ctx),
         EnumDecl(t) => generate_enum_decl(name, t, ctx),
-        Directive(_) => panic!("ICE: Directive item should have been processed before codegen"),
     }
 }
 

@@ -20,35 +20,15 @@ fn parse_source_file<P: AsRef<Path>>(path: P) -> Vec<ast::Item> {
     parser::parse(tokens)
 }
 
-fn execute_include_directives(items: Vec<ast::Item>) -> Vec<ast::Item> {
-
-    let mut resulting_items = Vec::new();
-    resulting_items.reserve(items.len());
-
-    for item in items {
-
-        if let ast::ItemKind::Directive(ast::DirectiveKind::Include(ref filename)) = item.node {
-            let mut additional_nodes = parse_source_file(filename);
-            resulting_items.append(&mut additional_nodes);
-        } else {
-            resulting_items.push(item);
-        }
-    }
-
-    resulting_items
-}
-
 fn main() {
     if env::args().len() != 2 {
         panic!("Arguments must be exactly one filepath!");
     }
     let path_str = &env::args().last().unwrap();
     let path = Path::new(path_str);
-    let mut items = parse_source_file(&path);
+    let items = parse_source_file(&path);
 
     let file_stem = path.file_stem().unwrap().to_str().unwrap();
-
-    items = execute_include_directives(items);
 
     //let typed_items = type_checking::check(items);
 

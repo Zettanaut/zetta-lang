@@ -1,6 +1,6 @@
 
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub struct Span {
     pub from: u32,
     pub to: u32
@@ -13,3 +13,6 @@ impl Span {
         }
     }
 }
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+pub struct Symbol(u32);

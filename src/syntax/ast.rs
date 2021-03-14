@@ -13,15 +13,8 @@ pub enum ItemKind {
     ConstDecl(Type, Box<Expr>),
     FunctionDecl(Box<Signature>, Option<Box<Block>>),
     VariableDecl(Type, Option<Box<Expr>>),
-    Directive(DirectiveKind),
     StructDecl(Type),
-    UnionDecl(Type),
     EnumDecl(Type)
-}
-
-#[derive(Debug, Clone)]
-pub enum DirectiveKind {
-    Include(String),
 }
 
 #[derive(Debug, Clone)]
@@ -104,7 +97,6 @@ pub enum Type {
     Void,
     Function(Vec<Type>, Box<Type>),
     Struct(String, Vec<(String,Type)>),
-    Union(String, Vec<(String,Type)>),
     Enum(String, Vec<String>),
     Infer,
 }
